@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Japanese Quiz Game - Level Zero</title>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  /* --- GLOBAL RESET & BASE STYLES --- */
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { 
+    display:flex; justify-content:center; align-items:center; height:100vh; overflow:hidden;
+    color:white; 
+    font-family:'Poppins', sans-serif;
+    position: relative; 
+    
+    /* Default background (akan di-override oleh JS) */
+    background-color: #0d1a2f; 
+    background-size: cover; 
+    background-position: center; 
+    background-repeat: no-repeat;
+    transition: background-image 0.8s ease, background-color 0.8s ease; 
+  } 
+  
+  /* --- SCREEN LAYOUT & TRANSITIONS --- */
+  .menu-container, .level-container, .game-container, .end-container { 
+    position:relative; z-index:2; display:none; justify-content:center; align-items:center; height:100%; width:100%; 
+  }
+  .active{display:flex;} 
+  .fade-in{animation:fadeIn 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;} 
+  .fade-out{animation:fadeOut 0.4s ease-out forwards;}
+  @keyframes fadeIn{from{opacity:0; transform:scale(0.95) translateY(10px);} to{opacity:1; transform:scale(1) translateY(0);}}
+  @keyframes fadeOut{from{opacity:1; transform:scale(1) translateY(0);} to{opacity:0; transform:scale(0.95) translateY(-10px);}}
+  
+  /* --- WIN/LOSE ANIMATIONS --- */
+  @keyframes winPop {
+      0% { transform: scale(0.5); opacity: 0; box-shadow: 0 0 0 0 rgba(76, 175, 80, 0.4); }
+      70% { transform: scale(1.1); box-shadow: 0 0 20px 10px rgba(76, 175, 80, 0.7); }
+      100% { transform: scale(1); opacity: 1; box-shadow: 0 10px 30px rgba(0,0,0,0.6); }
+  }
+  
+  @keyframes loseShake {
+      0%, 100% { transform: translateX(0); }
+      20%, 60% { transform: translateX(-10px); }
+      40%, 80% { transform: translateX(10px); }
+  }
+
+  .end-container.win-animation .card { animation: winPop 0.8s ease-out forwards; }
+  .end-container.lose-animation .card { animation: loseShake 0.4s ease-in-out 3; }
+
+  /* --- MAIN CARD (GLASS EFFECT) --- */
+  .card{
+        background: rgba(255,255,255,0.08); 
+        backdrop-filter: blur(5px); 
+        padding:40px 50px; 
+        border-radius:20px;
+        box-shadow:0 10px 30px rgba(0,0,0,0.5); 
+        text-align:center; 
+        width:85%; 
+        max-width:480px;
+        border: 1px solid rgba(255, 255, 255, 0.15); 
+  }
+  
+  /* --- TYPOGRAPHY --- */
+  h1{
+    font-size:2em;
+    margin-bottom:15px;
+    font-weight:800;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8); 
+  } 
+  p{margin:8px 0;font-size:1em;font-weight:600;} 
+  .hearts{font-size:1.1em;margin-bottom:0;} 
+
+  /* --- QUESTION & STATS BOXES --- */
+  #question {
+      font-weight: 700;
+      line-height: 1.4;
+      background: rgba(0, 0, 0, 0.6); 
+      padding: 15px; 
+      border-radius: 10px;
+      margin: 8px 0 20px 0; 
+  }
+  
+  #statsTable {
+      display: flex;
+      justify-content: space-around;
+      align-items: center;
+      width: 100%;
+      margin-bottom: 15px;
+      padding: 10px;
+      border-radius: 10px;
+      background: rgba(0, 0, 0, 0.6); 
+      box-shadow: inset 0 0 8px rgba(255, 255, 255, 0.1);
+  }
+  .stat-item {
+      padding: 5px;
+      line-height: 1.2;
+      flex-grow: 1;
+  }
+  .stat-item p {
+      margin: 0;
+      font-size: 0.9em; 
+  }
+
+  /* --- PROGRESS BAR --- */
+  .progress-container{
+      width:100%;
+      background: rgba(0, 0, 0, 0.6); 
+      border-radius:10px; 
+      overflow:hidden; 
+      height:12px; 
+      margin:10px 0;
+      box-shadow: inset 0 0 8px rgba(255, 255, 255, 0.1);
+  }
+  .progress-bar{
+      height:12px;
+      width:0%;
+      background:#4caf50;
+      transition:width 0.6s ease;
+      box-shadow: 0 0 8px 1px #4caf50; /* GLOW HIJAU */
+  }
+  
+  /* --- BUTTON STYLES --- */
+  button{
+        display:block;width:100%;margin:8px auto;padding:12px 0;border:none;border-radius:12px;
+        font-weight:700;
+        background: linear-gradient(145deg, #ff5e62, #e05558); /* Merah-Oranye */
+        color:white;cursor:pointer;transition:all 0.25s ease;
+        box-shadow: 0 6px 20px rgba(255, 94, 98, 0.4);
+  }
+  button:hover{
+      transform:translateY(-3px);
+      background: linear-gradient(145deg, #ff9966, #ff5e62);
+      box-shadow: 0 8px 25px rgba(255, 94, 98, 0.6);
+  } 
+  button:active{transform:scale(0.94);}
+  
+  /* Correct & Wrong Answer Styles */
+  .correct{ background:#4caf50 !important; box-shadow:0 0 10px 2px rgba(76, 175, 80, 0.7); } 
+  .wrong{ background:#e53935 !important; box-shadow:0 0 10px 2px rgba(229, 57, 53, 0.7); } 
+  
+  .clue{margin-top:10px;font-size:0.9em;opacity:0.9;color:#ffeb3b;font-style:italic;} 
+  
+  /* --- MODAL STYLES (GLASSMORPHISM OVERLAY) --- */
+  .modal{
+        position:fixed;top:0;left:0;width:100%;height:100%;
+        background: rgba(0,0,0, 0.4); 
+        backdrop-filter: blur(10px); 
+        display:none;justify-content:center;align-items:center; z-index:99;
+  }
+  .modal.active{display:flex;}
+  
+  .modal-card{
+      background: rgba(255, 255, 255, 0.15); 
+      backdrop-filter: blur(15px);
+      padding:30px 40px; 
+      border-radius:20px;
+      text-align:center; 
+      box-shadow:0 10px 30px rgba(0,0,0,0.6); 
+      animation:fadeIn 0.5s ease;
+      border: 1px solid rgba(255, 255, 255, 0.3); 
+      width: 80%; 
+      max-width: 400px;
+  }
+  .close-btn{
+      background:#4caf50; 
+      box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3);
+      color:white;padding:10px 20px;border:none;border-radius:12px;cursor:pointer;font-weight:600;
+  }
+  .close-btn:hover{background:#66bb6a; transform:translateY(-2px);}
+  
+  /* --- OPTIONS STYLES (Music & Background) --- */
+  .music-options, .background-options {
+      display: grid;
+      gap: 10px;
+      margin-top: 10px;
+  }
+  .music-options { 
+      grid-template-columns: 1fr 1fr; 
+  }
+  .background-options { /* Adjusted to 2 columns for the 4 options (B1, B2, B3, GIF/B4) */
+      grid-template-columns: 1fr 1fr; 
+  }
+  .music-options button, .background-options button {
+      margin: 0;
+      padding: 8px 10px;
+      font-size: 0.8em;
+      box-shadow: none;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+      background: #4a4e69; 
+  }
+  .music-options button:hover, .background-options button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+  }
+  
+  /* Modal Specific Styles */
+  .modal-divider {
+      border-top: 1px solid rgba(255,255,255,0.2); 
+      margin-top: 20px; 
+      padding-top: 20px;
+  }
+  .modal-card p {
+      margin-top: 10px;
+      margin-bottom: 5px;
+      font-weight: 600;
+      font-size: 0.95em;
+      color: #ccc;
+  }
+
+  /* --- RESPONSIVE ADJUSTMENTS --- */
+  @media(max-width:480px){
+     .card{padding:25px 20px;}
+     h1{font-size:1.5em;}
+     .stat-item p{font-size:0.8em;}
+     button{font-size:0.9em;padding:10px;}
+     .music-options, .background-options {
+        grid-template-columns: 1fr; /* Stack buttons on small screens */
+     }
+  }
+</style>
+</head>
+<body>
+
+<div class="menu-container active fade-in" id="menu">
+  <div class="card">
+    <h1>🇯🇵 NIHONGO QUIZ</h1>
+    <button onclick="switchScreen('menu','level')">▶️ MULAI</button>
+    <button onclick="openCredits()">📜 CREDITS</button>
+    <button onclick="openOptions()">⚙️ OPSI</button>
+    <button onclick="playSFX('click'); alert('Terima kasih sudah mampir 👋')">❌ KELUAR</button>
+  </div>
+</div>
+
+<div class="level-container" id="level">
+  <div class="card">
+    <h1>PILIH MODUL BELAJAR</h1>
+    <button onclick="startGame('hiragana_vokabulari')">📕 HIRAGANA & VOKABULARI</button>
+    <button onclick="startGame('salam_frasa')">🗣️ SALAM & FRASA DASAR</button>
+    <button onclick="startGame('tata_bahasa_angka')">🔢 TATA BAHASA & ANGKA</button> 
+    <button onclick="switchScreen('level','menu')">⬅️ KEMBALI</button>
+  </div>
+</div>
+
+<div class="game-container" id="game">
+  <div class="card" id="gameCard">
+    <h1 id="gameTitle">🧩 QUIZ</h1>
+    
+    <div id="statsTable">
+        <div class="stat-item"><p id="levelText">LEVEL 1</p></div>
+        <div class="stat-item"><p class="hearts" id="hearts">❤️❤️❤️</p></div>
+        <div class="stat-item"><p class="score">SKOR: <span id="score">0</span></p></div>
+    </div>
+
+    <div class="progress-container"><div class="progress-bar" id="progressBar"></div></div>
+    <p id="question">PERTANYAAN ...</p>
+    <div id="choices"></div>
+    <button id="clueBtn" onclick="showClue()">💡 CLUE</button>
+    <p id="clueText" class="clue"></p>
+    <button onclick="switchScreen('game','level')">⬅️ KEMBALI</button>
+  </div>
+</div>
+
+<div class="end-container" id="end">
+  <div class="card">
+    <h1 id="endTitle">🎉 SELAMAT!</h1>
+    <p id="endMessage">KAMU BERHASIL MENYELESAIKAN SEMUA LEVEL 🎯</p>
+    <button onclick="switchScreen('end','menu')">⬅️ KEMBALI KE MENU</button>
+  </div>
+</div>
+
+<div class="modal" id="creditsModal">
+  <div class="modal-card">
+    <h2>📜 CREDITS</h2>
+    <p>Dibuat untuk belajar Bahasa Jepang dasar.</p>
+    <button class="close-btn" onclick="closeCredits()">TUTUP</button>
+  </div>
+</div>
+
+<div class="modal" id="optionsModal">
+  <div class="modal-card">
+    <h2>⚙️ OPSI</h2>
+    
+    <div>
+        <p>PILIH MUSIK LATAR:</p>
+        <div class="music-options">
+            <button onclick="selectMusic('akuma-noko.mp3')">Akuma no Ko</button>
+            <button onclick="selectMusic('antent.mp3')">Antent</button>
+        </div>
+        <p style="margin-top: 15px;">MUSIK STATUS: <span id="musicStatus">OFF</span></p>
+        <button id="musicToggleBtn" onclick="toggleMusic()"></button> 
+    </div>
+    <div class="modal-divider">
+        <p>ATUR VOLUME:</p>
+        <input type="range" min="0" max="1" step="0.1" value="0.5" class="volume-control" id="volumeSlider">
+    </div>
+    <div class="modal-divider">
+        <p>PILIH TEMA LATAR:</p>
+        <div class="background-options">
+            <button onclick="setCustomBackground('beckgrond1')">BECKGROND 1</button>
+            <button onclick="setCustomBackground('beckgrond2')">BECKGROND 2</button>
+            <button onclick="setCustomBackground('beckgrond3')">BECKGROND 3</button>
+            <button onclick="setCustomBackground('final_gif')">BECKGROND 4</button> 
+        </div>
+    </div>
+    <button class="close-btn" onclick="closeOptions()">TUTUP</button>
+  </div>
+</div>
+
+
+<audio id="gameMusic" src="akuma-noko.mp3" loop preload="auto"></audio> 
+<audio id="clickSFX" src="click.mp3" preload="auto"></audio>
+<audio id="correctSFX" src="correct.mp3" preload="auto"></audio>
+<audio id="wrongSFX" src="wrong.mp3" preload="auto"></audio>
+<audio id="winSFX" src="win.mp3" preload="auto"></audio>
+<audio id="loseSFX" src="lose.mp3" preload="auto"></audio>
+
+<script>
+// --- ELEMENT REFERENCES ---
+const levelText=document.getElementById("levelText"), 
+      questionText=document.getElementById("question"),
+      choicesDiv=document.getElementById("choices"), 
+      heartsText=document.getElementById("hearts"),
+      endTitle=document.getElementById("endTitle"), 
+      endMessage=document.getElementById("endMessage"),
+      clueText=document.getElementById("clueText"), 
+      gameTitle=document.getElementById("gameTitle"),
+      scoreText=document.getElementById("score"), 
+      progressBar=document.getElementById("progressBar"),
+      creditsModal=document.getElementById("creditsModal"),
+      optionsModal=document.getElementById("optionsModal"), 
+      volumeSlider=document.getElementById("volumeSlider"),
+      musicToggleBtn=document.getElementById('musicToggleBtn'), 
+      musicStatusText = document.getElementById('musicStatus'); 
+
+// --- AUDIO REFERENCES ---
+const gameMusic = document.getElementById('gameMusic');
+const clickSFX = document.getElementById('clickSFX');
+const correctSFX = document.getElementById('correctSFX');
+const wrongSFX = document.getElementById('wrongSFX');
+const winSFX = document.getElementById('winSFX');
+const loseSFX = document.getElementById('loseSFX');
+
+// --- GAME STATE VARIABLES ---
+let currentLevel=0, 
+    lives=3, 
+    score=0, 
+    levelSet=[], 
+    volume=0.5, 
+    isMusicOn = false, 
+    selectedBackgroundTheme = 'beckgrond1', // Default background
+    selectedMusicFile = 'akuma-noko.mp3'; // Default music
+
+// --- MUSIC & VOLUME CONTROLS ---
+function selectMusic(filename) {
+    playSFX('click');
+    selectedMusicFile = filename;
+    gameMusic.src = selectedMusicFile;
+    gameMusic.load(); 
+    if (isMusicOn) {
+        gameMusic.play().catch(e => console.error("Music play blocked:", e));
+    }
+}
+
+function updateMusicState() {
+    gameMusic.volume = volume;
+    if (isMusicOn) {
+        gameMusic.play().catch(e => console.log("Music play blocked, waiting for user interaction."));
+        musicStatusText.textContent = 'ON';
+    } else {
+        gameMusic.pause();
+        musicStatusText.textContent = 'OFF';
+    }
+    musicToggleBtn.textContent = isMusicOn ? 'MATIKAN MUSIK' : 'NYALAKAN MUSIK';
+}
+
+function toggleMusic() {
+    playSFX('click');
+    isMusicOn = !isMusicOn; 
+    updateMusicState();
+}
+
+volumeSlider.oninput=()=>{
+    volume = volumeSlider.value;
+    gameMusic.volume = volume;
+    clickSFX.volume = volume; 
+    correctSFX.volume = volume; 
+    wrongSFX.volume = volume; 
+    winSFX.volume = volume; 
+    loseSFX.volume = volume; 
+};
+
+// --- BACKGROUND CONTROL (UPDATED: beckgrond4.jpg removed, final_gif is now 'BECKGROND 4') ---
+function setCustomBackground(theme) {
+    selectedBackgroundTheme = theme;
+    let backgroundURL = '';
+
+    if (theme === 'beckgrond1') {
+        backgroundURL = "url('beckgrond1.jpg')";
+    } else if (theme === 'beckgrond2') {
+        backgroundURL = "url('beckgrond2.jpg')";
+    } else if (theme === 'beckgrond3') {
+        backgroundURL = "url('beckgrond3.jpg')";
+    } else if (theme === 'final_gif') { // 'BECKGROND 4' now uses GIF
+        backgroundURL = "url('final_gif.gif')";
+    } else {
+        document.body.style.backgroundImage = 'none';
+        document.body.style.backgroundColor = '#0d1a2f'; // Fallback color
+        return; 
+    }
+    
+    document.body.style.backgroundImage = backgroundURL;
+    document.body.style.backgroundSize = 'cover';
+    document.body.style.backgroundPosition = 'center';
+    document.body.style.backgroundRepeat = 'no-repeat';
+
+    if (document.getElementById('optionsModal').classList.contains('active')) {
+        playSFX('click');
+    }
+}
+
+// --- SOUND EFFECTS (SFX) CONTROL ---
+function playSFX(type) {
+    let sfx;
+    if (type === 'correct') { sfx = correctSFX; } 
+    else if (type === 'wrong') { sfx = wrongSFX; } 
+    else if (type === 'click') { sfx = clickSFX; } 
+    else if (type === 'win') { sfx = winSFX; } 
+    else if (type === 'lose') { sfx = loseSFX; } 
+    else { return; }
+    
+    if (sfx.readyState >= 2) { 
+        sfx.currentTime = 0;
+        sfx.volume = volume; 
+        sfx.play().catch(e => console.error("SFX playback failed:", e));
+    }
+}
+
+// --- UTILITY FUNCTIONS ---
+function updateHearts(){heartsText.textContent="❤️".repeat(lives);}
+function updateScore(points){score+=points;if(score<0)score=0;scoreText.textContent=score;}
+function updateProgress(){progressBar.style.width=((currentLevel)/levelSet.length*100)+"%";}
+function shuffleArray(arr){return arr.sort(()=>Math.random()-0.5);}
+
+// --- MODAL CONTROLS ---
+function openCredits(){playSFX('click'); creditsModal.classList.add("active");}
+function closeCredits(){playSFX('click'); creditsModal.classList.remove("active");}
+function openOptions(){playSFX('click'); optionsModal.classList.add("active");}
+function closeOptions(){playSFX('click'); optionsModal.classList.remove("active");}
+
+// --- CORE GAME LOGIC ---
+function loadLevel(){
+  levelText.textContent="LEVEL "+(currentLevel+1); 
+  const q=levelSet[currentLevel]; 
+  questionText.textContent=q.q; 
+  choicesDiv.innerHTML=""; 
+  clueText.textContent="";
+  document.getElementById("clueBtn").disabled=false;
+  
+  let options = shuffleArray([...q.options]);
+
+  options.forEach(opt=>{
+    const btn=document.createElement("button");
+    btn.textContent=opt.toUpperCase(); 
+    btn.onclick=()=>{
+        playSFX('click'); 
+        checkAnswer(opt,btn);
+    }; 
+    choicesDiv.appendChild(btn);
+  }); 
+  updateHearts(); 
+  updateProgress(); 
+}
+
+function checkAnswer(choice,btn){
+  const q=levelSet[currentLevel];
+  Array.from(choicesDiv.children).forEach(b => b.disabled = true); 
+
+  if(choice.trim().toLowerCase()===q.answer.trim().toLowerCase()){
+    btn.classList.add("correct"); 
+    playSFX("correct");
+    updateScore(100); 
+    setTimeout(nextLevel,800);
+  } else {
+    btn.classList.add("wrong"); 
+    playSFX("wrong");
+    lives--; 
+    updateScore(-50); 
+    updateHearts();
+    
+    if(lives<=0){
+      setTimeout(()=>{
+        endTitle.textContent="💀 GAME OVER!"; 
+        endMessage.textContent=`NYAWAMU HABIS. SKOR AKHIR: ${score}`;
+        playSFX('lose'); 
+        switchScreen('game','end', false, 'lose'); // Panggil animasi 'lose'
+      },1000);
+    } else {
+      setTimeout(() => {
+        Array.from(choicesDiv.children).forEach(b => b.classList.remove("wrong", "correct"));
+        loadLevel();
+      }, 1200); 
+    }
+  }
+}
+
+function nextLevel(){
+  currentLevel++;
+  if(currentLevel<levelSet.length){
+    loadLevel();
+  }else{
+    updateProgress(); 
+    endTitle.textContent="🎉 BERES!"; 
+    endMessage.textContent=`MODUL SELESAI!\nSKOR AKHIR: ${score}`;
+    playSFX('win'); 
+    switchScreen('game','end', false, 'win'); // Panggil animasi 'win'
+  }
+}
+
+function showClue(){
+    playSFX('click'); 
+    clueText.textContent="💡 "+levelSet[currentLevel].clue.toUpperCase(); 
+    document.getElementById("clueBtn").disabled=true;
+} 
+
+function startGame(level){
+  playSFX('click'); 
+  const levelEl = document.getElementById('level');
+  const gameEl = document.getElementById('game');
+  
+  currentLevel=0; 
+  lives=3; 
+  score=0;
+  
+  if(level==="hiragana_vokabulari"){levelSet=shuffleArray([...questions.hiragana_vokabulari]);}
+  else if(level==="salam_frasa"){levelSet=shuffleArray([...questions.salam_frasa]);}
+  else if(level==="tata_bahasa_angka"){levelSet=shuffleArray([...questions.tata_bahasa_angka]);} 
+  
+  gameTitle.textContent="🧩 QUIZ "+level.toUpperCase().replace(/_/g, " "); 
+  updateScore(0); 
+  updateProgress();
+  
+  levelEl.classList.remove("fade-in"); 
+  levelEl.classList.add("fade-out");
+
+  setTimeout(() => {
+    levelEl.classList.remove("active", "fade-out"); 
+    gameEl.classList.add("active", "fade-in");
+    loadLevel(); 
+  }, 400); 
+}
+
+// --- SCREEN NAVIGATION ---
+function switchScreen(from,to, playClick = true, finalState = null){
+  if (playClick) { playSFX('click'); }
+  
+  const fromEl=document.getElementById(from), 
+        toEl=document.getElementById(to),
+        endContainer = document.getElementById('end');
+
+  fromEl.classList.remove("fade-in"); 
+  fromEl.classList.add("fade-out");
+  
+  setCustomBackground(selectedBackgroundTheme); 
+
+  // Bersihkan kelas animasi akhir sebelum transisi
+  endContainer.classList.remove('win-animation', 'lose-animation');
+
+  setTimeout(()=>{
+    fromEl.classList.remove("active","fade-out"); 
+    toEl.classList.add("active","fade-in");
+    
+    // Terapkan animasi khusus (win/lose) jika masuk ke layar akhir
+    if (to === 'end' && finalState) {
+        endContainer.classList.add(`${finalState}-animation`);
+    }
+  },400); 
+}
+
+// --- INITIALIZATION ON LOAD ---
+document.addEventListener('DOMContentLoaded', () => {
+    setCustomBackground('beckgrond1'); // Set default background
+    updateMusicState(); // Update music status
+    gameMusic.src = selectedMusicFile; // Set default music source
+});
+
+// ============== JAPANESE QUIZ QUESTIONS (NO CHANGES) ==============
+const questions={
+  hiragana_vokabulari:[
+    {q:"Apa terjemahan dari Hiragana 'い'?",options:["a","i","u","e"],answer:"i",clue:"Vokal kedua dalam urutan Hiragana."},
+    {q:"Hiragana untuk suara 'ka' adalah...",options:["き","か","く","こ"],answer:"か",clue:"Baris K, vokal A."},
+    {q:"Hiragana untuk suara 'su' adalah...",options:["せ","そ","す","し"],answer:"す",clue:"Baris S, vokal U."},
+    {q:"Kata 'Anjing' dalam bahasa Jepang adalah...",options:["ねこ","いぬ","さかな","とり"],answer:"いぬ",clue:"Tiga huruf Hiragana: I, Nu."},
+    {q:"Kata 'Bunga' (Flower) dalam Hiragana adalah...",options:["はな","ちず","くるま","てんき"],answer:"はな",clue:"Hana juga berarti 'hidung', hati-hati konteksnya."},
+    {q:"Huruf Hiragana 'も' dibaca...",options:["ma","me","mo","mu"],answer:"mo",clue:"Baris M, vokal O."},
+    {q:"Bagaimana Hiragana 'へ' dibaca?",options:["he","ho","hi","ha"],answer:"he",clue:"Partikel ini juga bisa dibaca 'e' saat berfungsi sebagai partikel arah."},
+    {q:"Apa terjemahan dari Hiragana 'む'?",options:["mu","nu","ru","fu"],answer:"mu",clue:"Hiragana ini mirip dengan 'nu' tapi ada kait kecil di bawah."},
+    {q:"Kata 'Air' dalam bahasa Jepang adalah...",options:["ひ","みず","ゆき","くも"],answer:"みず",clue:"Terdiri dari M_ dan Z_."},
+    {q:"Hiragana untuk suara 'tsu' adalah...",options:["ち","た","つ","と"],answer:"つ",clue:"Huruf ini sering digunakan sebagai penanda konsonan ganda kecil (sokuon)."},
+  ],
+  salam_frasa:[
+    {q:"Bagaimana cara mengucapkan 'Selamat Malam'?",options:["おはよう","こんにちは","こんばんは","おやすみ"],answer:"こんばんは",clue:"Digunakan dari sore hari hingga malam."},
+    {q:"Apa jawaban yang tepat untuk 'Arigatou Gozaimasu' (Terima Kasih)?",options:["さようなら","ごめんなさい","どういたしまして","おげんきですか"],answer:"どういたしまして",clue:"Berarti 'Sama-sama' atau 'Tidak masalah'."},
+    {q:"Frasa yang diucapkan saat Anda menyambut seseorang kembali ke rumah (mis. 'Selamat datang kembali')?",options:["ただいま","いってきます","おかえりなさい","いただきます"],answer:"おかえりなさい",clue:"Diucapkan oleh orang yang menyambut."},
+    {q:"Bagaimana Anda mengucapkan 'Selamat Tinggal' (terutama untuk jangka waktu lama atau formal)?",options:["またね","じゃあね","さようなら","おやすみ"],answer:"さようなら",clue:"Secara hariafiah 'Jika demikian adanya'."},
+    {q:"Saat menerima makanan/minuman, frasa yang diucapkan sebelum makan/minum?",options:["ごちそうさま","いただきます","おいしい","ありがとう"],answer:"いただきます",clue:"Berarti 'Saya akan menerima [makanan ini]'."},
+    {q:"Apa arti dari frasa 'おげんきですか'?",options:["Apa pekerjaanmu?","Kamu sudah makan?","Apa kabar?","Sampai jumpa besok"],answer:"Apa kabar?",clue:"Secara hariafiah 'Apakah Anda bersemangat/sehat?'."},
+    {q:"Jika Anda ingin mengatakan 'Saya minta maaf' karena telah melakukan kesalahan, Anda akan menggunakan...",options:["すみません","ごめんなさい","だいじょうぶ","しつれいします"],answer:"ごめんなさい",clue:"Ungkapan permintaan maaf yang lebih personal."},
+    {q:"Frasa yang digunakan saat Anda masuk ke ruangan atau kantor orang lain sebagai permintaan izin?",options:["ごめんね","どうぞ","しつれいします","おねがいします"],answer:"しつれいします",clue:"Berarti 'Permisi' atau 'Maafkan saya atas ketidak sopanan [memasuki ruanganmu]'."},
+    {q:"Bagaimana cara mengucapkan 'Selamat Sore' (Selamat Siang)?",options:["おはよう","こんにちは","こんばんは","おやすみ"],answer:"こんにちは",clue:"Ini adalah sapaan paling umum di siang hari."},
+    {q:"Jika Anda baru bertemu seseorang, kalimat perkenalan pertama Anda adalah...",options:["さようなら","ありがとう","はじめまして","いただきます"],answer:"はじめまして",clue:"Berarti 'Ini pertama kalinya [kita bertemu]'."},
+  ],
+  tata_bahasa_angka:[
+    {q:"Partikel yang digunakan untuk menandai subjek atau topik kalimat (mis. 'Saya (adalah)...')?",options:["が","を","で","は"],answer:"は",clue:"Meskipun tertulis 'ha', partikel ini dibaca 'wa'."},
+    {q:"Bagaimana penulisan angka 7?",options:["ご","いち","なな","じゅう"],answer:"なな",clue:"Angka tujuh memiliki dua cara baca: Nana dan Shichi."},
+    {q:"Partikel apa yang digunakan untuk menandai objek langsung (mis. 'Makan Apel...')?",options:["が","を","に","と"],answer:"を",clue:"Partikel ini hanya memiliki satu fungsi, yaitu menandai objek."},
+    {q:"Bagaimana cara menyebut angka 3?",options:["に","よん","さん","いち"],answer:"さん",clue:"Angka ini merupakan huruf Hiragana yang paling sederhana."},
+    {q:"Apa partikel yang menunjukkan kepemilikan (mis. 'Buku milik saya...')?",options:["の","へ","を","で"],answer:"の",clue:"Partikel ini berfungsi seperti apostrof s ('s) dalam bahasa Inggris."},
+    {q:"Angka 9 dalam bahasa Jepang dibaca...",options:["ろく","きゅう","はち","いち"],answer:"きゅう",clue:"Angka 9 juga memiliki dua cara baca: Kyuu dan Ku."},
+    {q:"Partikel yang menunjukkan arah (mis. 'Pergi ke Tokyo')?",options:["で","へ","と","に"],answer:"へ",clue:"Meskipun tertulis 'he', partikel ini dibaca 'e'."},
+    {q:"Kalimat 'Ini adalah buku.' dalam bahasa Jepang adalah: 'Kore __ hon desu.'",options:["は","が","を","と"],answer:"は",clue:"Partikel yang digunakan untuk menandai topik kalimat."},
+    {q:"Bagaimana cara menyebut angka 0?",options:["いち","ゼロ","ご","ろく"],answer:"ゼロ",clue:"Juga bisa dibaca 'rei'."},
+    {q:"Partikel yang menunjukkan alat atau cara (mis. 'Makan dengan sumpit')?",options:["と","に","で","が"],answer:"で",clue:"Partikel ini memiliki banyak fungsi, salah satunya menandai tempat atau cara."},
+  ]
+};
+</script>
+</body>
+</html>
